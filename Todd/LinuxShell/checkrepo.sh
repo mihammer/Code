@@ -2,6 +2,7 @@
 #
 # Perform instance check and attempt fixes for registration to SUSE Update Infrastructure.
 #
+#testing
 VERSION="1.0.0"
 SCRIPTNAME=`basename $0`
 # Clean the environment
@@ -11,11 +12,11 @@ LANG="POSIX"
 export PATH TERM LANG
 
 # baseproduct symbolic link should reference if SLES for SAP
-readonly SAP_BASEPRODUCT="/etc/products.d/SLES_SAP.prod"
+#readonly SAP_BASEPRODUCT="/etc/products.d/SLES_SAP.prod"
 # baseproduct symbolic link should reference if SLES
-readonly SLES_BASEPRODUCT="/etc/products.d/SLES.prod"
+#readonly SLES_BASEPRODUCT="/etc/products.d/SLES.prod"
 # Keep track of the number of problems. If > 0, run registercloudguest at end 
-COUNT=0
+#COUNT=0
 
 
 #######################################
@@ -23,127 +24,74 @@ COUNT=0
 #######################################
 function header() {
   # Need confirmation from user to run
-  cecho -c 'yellow' "!!THIS SCRIPT SHOULD ONLY BE USED IF INSTANCE HAS REPOSITORY ISSUES!!"
+  cecho -c 'yellow' "!!THIS SCRIPT SHOULD ONLY BE USED IF INSTANCE HAS YUM REPOSITORY ISSUES!!"
   read -p "Are you sure you want to continue? [y/n] " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     cecho -c 'yellow' "Press [Y] or [y] next time to continue check"
 	safe_exit
   fi
-  cecho -c 'bold' "## SUSECLOUD-REPOCHECK ##"
+  cecho -c 'bold' "## YUM-REPOCHECK ##"
   cecho -c 'bold' "`date`"
 }
 
 #######################################
-# If there are multiple SMT entries in /etc/hosts, there can be update issues
-# Check /etc/hosts files for problems and fix if there are
-# Globals:
-#   ETC_HOSTS
-#	PATTERN1
-#   PATTERN2
-# Arguments:
-#   None
+#Checking if the ssl cert dates are valid
+# See https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#update-expired-rhui-client-certificate-on-a-vm
 #######################################
-function check_hosts() {
-  ETC_HOSTS="/etc/hosts"
-  PATTERN1="smt-${FRAMEWORK}.susecloud.net"
-  PATTERN2="Added by SMT registration do not remove"
-  cecho -c 'bold' "-Checking /etc/hosts for multiple records"
-  NUM_HOST_ENTRIES="$(grep -c $PATTERN1 $ETC_HOSTS)"
-  if [[ "${NUM_HOST_ENTRIES}" -ge 2 ]]; then
-    COUNT="$((COUNT+1))"
-	cecho -c 'red' "PROBLEM: Multiple SMT records exist, deleting"
-    delete_hosts
-  elif [[ "${NUM_HOST_ENTRIES}" -eq 0 ]]; then
-    COUNT="$((COUNT+1))"
-    cecho -c 'red' "PROBLEM: No SMT records exist. Running registercloudguest before continuing"
-  else
-	cecho -c 'green' "/etc/hosts OK"
-	# Now check that the hosts records matches correct region
-	check_current_smt
+function sslcert {
+echo " " 
+cecho -c 'yellow' "Checking if the ssl cert dates are valid"
+openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not Before|Not After'
+read -p "Does today's date fall between the Not Before and Not After date? [y/n] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    cecho -c 'yellow' "Update the RHUI cert and try updates again"
+    cecho -c 'blue' "See https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#update-expired-rhui-client-certificate-on-a-vm"
+        safe_exit
   fi
 }
 
 #######################################
-# Delete /etc/hosts entry
-# Globals:
-#   None
-# Arguments:
-#   None
+#
+# Checking for connectivity to rhui-1.microsoft.com over port 443 
+#
 #######################################
-function delete_hosts() {
-  sed --in-place=.sc-repocheck "/$PATTERN1/d" $ETC_HOSTS
-  sed -i "/$PATTERN2/d" $ETC_HOSTS
+function connectivityrhui {
+echo " " 
+cecho -c 'yellow' "Checking for connectivity to https://rhui-1.microsoft.com over port 443" 
+curl -v --connect-timeout 10 https://rhui-1.microsoft.com:443 &> /dev/null
+if [ $? -eq 0 ]; then
+   cecho -c 'green' "Successful - Server can connect to https://rhui-1.microsoft.com:443 "
+   sleep 1
+else
+   echo -c 'red' "FAIL - Need to determine why the VM does not have access to the above address"
+   echo -c 'red' "Potential reasons:"
+   echo -c 'red' "- VM is behind a Standard Internal Load balancer. A Basic load balancer is required."
+   echo -c 'red' "- A virtual network appliance could be blocking traffic. A UDR would be needed."
+   echo -c 'red' "- If a proxy is being used, yum needs to be required to use this  /etc/yum.conf
+proxy=http://<IP address>:<port number>"
+   echo -c 'red' "- VM is behind a Standard Internal Load balancer"
+        safe_exit
+fi
 }
 
 #######################################
-# Get the cloud service provider
-# Globals:
-#   FRAMEWORK
-# Arguments:
-#   None
+#
+# Checking for connectivity to rhui-1.microsoft.com over port 443
+#
 #######################################
-function framework() {
-#Check which framework script is checking
-  if dmidecode | grep -q Amazon; then
-	FRAMEWORK="ec2"
-  elif dmidecode | grep -q Google; then
-	FRAMEWORK="gce"
-  elif dmidecode | grep -q Microsoft; then
-	FRAMEWORK="azure"
-  else
-    cecho -c 'red' "No supported framework. Exiting"
-	safe_exit
-  fi
-}
-
-#######################################
-# Is this SLES-SAP or SLES?
-# Globals:
-#   OS
-# Arguments:
-#   None
-#######################################
-function os() {
-  if test -f "${SAP_BASEPRODUCT}"; then
-	OS="SAP"
-  elif test -f "${SLES_BASEPRODUCT}"; then
-    OS="SLES"
-  else 
-    cecho -c 'red' "No supported OS. Exiting"
-	safe_exit
-  fi	
-}
-
-#######################################
-# If baseproduct symbolic link is wrong, there can be update issues
-# Check if baseproduct link is correct for installed OS and fix if not
-# Globals:
-#   None
-# Arguments:
-#   None
-#######################################
-function check_baseproduct() {
-  cecho -c 'bold' "-Checking baseproduct symbolic link"
-  local baseproduct_file="/etc/products.d/baseproduct"
-  local baselink="$(readlink -f ${baseproduct_file})"
-  if [[ "${OS}" = "SAP" ]]; then
-    if [[ "${baselink}" = "${SAP_BASEPRODUCT}" ]]; then
-	  cecho -c 'green' "baseproduct OK"
-    else
-	  COUNT=$((COUNT+1))
-	  cecho -c 'yellow' "Baseproduct problem found. Fixing"
-	  ln -sf "${SAP_BASEPRODUCT}" "${baseproduct_file}"
-    fi
-  elif [[ "${OS}" = "SLES" ]]; then
-	if [[ "${baselink}" = "${SLES_BASEPRODUCT}" ]]; then
-			cecho -c 'green' "baseproduct OK"
-	else
-	COUNT=$((COUNT+1))
-			cecho -c 'yello' "Baseproduct problem found. Fixing"
-			ln -sf "${SLES_BASEPRODUCT}" "${baseproduct_file}"
-	fi
-  fi
+function checkdns {
+echo " " 
+cecho -c 'yellow' "Checking DNS Resolution to rhui-1.microsoft.com"
+nslookup rhui-1.microsoft.com > /dev/null
+if [ $? -eq 0 ]; then
+   cecho -c 'green' "Successful - DNS is resolving rhui-1.microsoft.com as required"
+   sleep 2
+else
+   cecho -c 'red' "FAIL - troubleshoot name resolution before continuing"
+        safe_exit
+fi
 }
 
 #######################################
@@ -523,17 +471,21 @@ die()
 #   None
 #######################################
 function main_script() {
+  clear
   header
-  framework
-  os
+  sslcert
+  checkdns
+  connectivityrhui
+  #framework
+  #os
   check_metadata
-  check_http
-  check_https
-  check_region_servers
-  check_hosts
-  check_baseproduct
-  check_regionclient_version
-  report
+  #check_http
+  #check_https
+  #check_region_servers
+  #check_hosts
+  #check_baseproduct
+  #check_regionclient_version
+  #report
 }
 
 
