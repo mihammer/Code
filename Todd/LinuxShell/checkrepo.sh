@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 #
-# Perform instance check and attempt fixes for registration to SUSE Update Infrastructure.
+# Perform checks for yum on VMs using Microsoft Azure RHUI
 #
-#testing
 VERSION="1.0.0"
 SCRIPTNAME=`basename $0`
 # Clean the environment
@@ -10,14 +9,6 @@ PATH="/sbin:/usr/sbin:/usr/local/sbin:/usr/local/bin:/bin:/usr/bin"
 test -n "${TERM}" || TERM="raw"
 LANG="POSIX"
 export PATH TERM LANG
-
-# baseproduct symbolic link should reference if SLES for SAP
-#readonly SAP_BASEPRODUCT="/etc/products.d/SLES_SAP.prod"
-# baseproduct symbolic link should reference if SLES
-#readonly SLES_BASEPRODUCT="/etc/products.d/SLES.prod"
-# Keep track of the number of problems. If > 0, run registercloudguest at end 
-#COUNT=0
-
 
 #######################################
 # Header display to user
@@ -33,6 +24,31 @@ function header() {
   fi
   cecho -c 'bold' "## YUM-REPOCHECK ##"
   cecho -c 'bold' "`date`"
+}
+
+#######################################
+#Checking if the vm is using the current RHUI
+#######################################
+function current {
+echo " "
+cecho -c 'yellow' "Checking if using the current RHUI"
+#check if /etc/yum.repos.d/rh-cloud.repo contains rhui-1-3. This would indicate it is using updated settings. 
+cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-1.microsoft.com" &> /dev/null 
+#if the above doesn't find rhui-1, it returns a failure, thus it couldn't find it. Checking for all 3 servers. 
+if [ $? -eq 0 ]; then
+cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-2.microsoft.com" &> /dev/null
+  if [ $? -eq 0 ]; then
+     cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-3.microsoft.com" &> /dev/null
+         if [ $? -eq 0 ]; then
+cecho -c 'green' "Successful - /etc/yum.repos.d/rh-cloud.repo contains the 3 update servers."
+   sleep 2
+else
+cecho -c 'red' "/etc/yum.repos.d/rh-cloud.repo is using outdated settings."
+   cecho -c 'red' "https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#manual-update-procedure-to-use-the-azure-rhui-servers"
+   safe_exit
+   fi
+fi
+fi
 }
 
 #######################################
@@ -94,32 +110,6 @@ else
 fi
 }
 
-#######################################
-# If instance isn't yet set for https_only, check if port 80 is open.  If 
-# not opened, report and exit
-# Globals:
-#   None
-# Arguments:
-#   None
-#######################################
-function check_http() {
-  cecho -c 'bold' "-Checking http access"
-  if (cat /etc/regionserverclnt.cfg | grep -q "httpsOnly = true"); then
-	cecho -c 'green' "http check unnecessary. httpsOnly=true. OK"
-  else
-	for i in "${smt_servers[@]}"; do
-	  http_return_code=$(curl -m 5 -s -o /dev/null -w "%{http_code}"  http://$i/rmt.crt)
-	  if [ $http_return_code -ne "200" ]; then
-        cecho -c 'red' "PROBLEM: http access issue. Open port 80 to SMT servers:"
-        cecho -c 'red' "${smt_servers[*]}"
-	    safe_exit
-	  else 
-	    cecho -c 'green' "http access OK"
-		break
-	  fi
-	done	
-fi
-}
 
 #######################################
 # Check if smt servers are accessible over https
@@ -473,12 +463,13 @@ die()
 function main_script() {
   clear
   header
+  current
   sslcert
   checkdns
   connectivityrhui
   #framework
   #os
-  check_metadata
+  #check_metadata
   #check_http
   #check_https
   #check_region_servers
@@ -488,109 +479,6 @@ function main_script() {
   #report
 }
 
-
-microsoft=$(cat <<EOF
-<?xml version='1.0' encoding='UTF-8'?>
-<servers>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.216.104" region="australiaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.210.206" region="australiaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.70.94.71" region="australiaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.235.14" region="australiasoutheast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.231.234" region="australiasoutheast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.73.107.146" region="australiasoutheast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="191.237.255.212" region="brazilsouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="191.237.253.40" region="brazilsouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="191.235.81.180" region="brazilsouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.85.225.32" region="canadacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.85.225.240" region="canadacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.228.41.50" region="canadacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.86.231.97" region="canadaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.86.231.128" region="canadaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.229.125.108" region="canadaeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.97.78" region="centralindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.98.58" region="centralindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.172.187.74" region="centralindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.86.112.4" region="centralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.165.88.13" region="centralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.86.104.2" region="centralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.14.157" region="eastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.3.47" region="eastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.75.123.198" region="eastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.188.224.179" region="eastus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.188.81.163" region="eastus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.186.168.210" region="eastus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.147.176.11" region="eastus2"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.186.88.79" region="eastus2"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.186.112.116" region="eastus2"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.66.32.54" region="francecentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.66.41.99" region="francecentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.66.48.231" region="francecentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.116.98.203" region="germanywestcentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.116.98.214" region="germanywestcentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.116.96.37" region="germanywestcentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.185.185.83" region="japaneast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.81.208.103" region="japaneast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.81.200.4" region="japaneast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.46.239.62" region="japanwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.46.239.65" region="japanwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.74.120.164" region="japanwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.39.82" region="koreacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.39.83" region="koreacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.34.241" region="koreacentral"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.201.188" region="koreasouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.201.178" region="koreasouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.231.202.220" region="koreasouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.164.199" region="northcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.171.119" region="northcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.96.231.74" region="northcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.158.42.90" region="northeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.79.120.39" region="northeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.155.248.41" region="northeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.120.2.195" region="norwayeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.120.0.31" region="norwayeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.120.2.159" region="norwayeast"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="102.133.128.124" region="southafricanorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="102.133.128.67" region="southafricanorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="102.133.129.51" region="southafricanorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.186.158" region="southcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.188.13" region="southcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="13.65.81.103" region="southcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.230.96.47" region="southeastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.237.80.2" region="southeastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.139.216.51" region="southeastasia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.227.174" region="southindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.227.169" region="southindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.172.51.125" region="southindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.107.0.120" region="switzerlandnorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.107.0.121" region="switzerlandnorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.107.0.122" region="switzerlandnorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.46.144.230" region="uaenorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.46.144.239" region="uaenorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.46.146.20" region="uaenorth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.39.208.99" region="uksouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.39.216.18" region="uksouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="20.39.224.10" region="uksouth"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.141.12.56" region="ukwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.141.12.57" region="ukwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.141.11.221" region="ukwest"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.161.26.245" region="westcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.161.27.73" region="westcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.161.26.42" region="westcentralus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.161.139" region="westindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.161.138" region="westindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="104.211.166.161" region="westindia"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.149.120.86" region="westeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="51.145.209.119" region="westeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.157.241.14" region="westeurope"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.100.46.123" region="westus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="23.101.192.253" region="westus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.112.248.207" region="westus"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="40.90.192.185" region="westus2"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.148.152.22" region="westus2"/>
-  <server type="smt" name="smt-azure.susecloud.net" ip="52.156.104.18" region="westus2"/>
-</servers>
-EOF
-)
 
 
 ############## End of Function definitions ###################
