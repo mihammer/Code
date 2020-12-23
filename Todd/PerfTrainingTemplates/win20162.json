@@ -1,0 +1,35 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "resources": [],
+    "parameters": {
+        "virtualMachines_Win2016_name": {
+            "defaultValue": "Win2016",
+            "type": "String"
+        },
+        "disks_Win2016_OsDisk_1_a080862003d64d659c047086d2b5638a_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Compute/disks/Win2016_OsDisk_1_a080862003d64d659c047086d2b5638a",
+            "type": "String"
+        },
+        "disks_Win2016_DataDisk_0_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Compute/disks/Win2016_DataDisk_0",
+            "type": "String"
+        },
+        "disks_Win2016_DataDisk_1_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Compute/disks/Win2016_DataDisk_1",
+            "type": "String"
+        },
+        "disks_Win2016_DataDisk_2_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Compute/disks/Win2016_DataDisk_2",
+            "type": "String"
+        },
+        "disks_Win2016_DataDisk_3_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Compute/disks/Win2016_DataDisk_3",
+            "type": "String"
+        },
+        "networkInterfaces_win2016673_externalid": {
+            "defaultValue": "/subscriptions/42d1afef-8200-4ad5-bf01-ed399582559b/resourceGroups/PerformanceTraining/providers/Microsoft.Network/networkInterfaces/win2016673",
+            "type": "String"
+        }
+    },
+}
