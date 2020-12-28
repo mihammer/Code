@@ -72,15 +72,6 @@ cecho -c 'red' Expiration date: $enddate
    cecho -c 'red' "See the following to update it: https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#manual-update-procedure-to-use-the-azure-rhui-servers"
    safe_exit
    fi
-
-openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not Before|Not After'
-read -p "Does today's date fall between the Not Before and Not After date? [y/n] " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    cecho -c 'yellow' "Update the RHUI cert and try updates again"
-    cecho -c 'blue' "See https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#update-expired-rhui-client-certificate-on-a-vm"
-        safe_exit
-  fi
 }
 
 #######################################
