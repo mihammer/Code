@@ -32,12 +32,12 @@ function current {
 echo " "
 cecho -c 'yellow' "Checking if using the current RHUI"
 #check if /etc/yum.repos.d/rh-cloud.repo contains rhui-1-3. This would indicate it is using updated settings. 
-cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-1.microsoft.com" &> /dev/null 
+grep "rhui-1.microsoft.com" /etc/yum.repos.d/rh-cloud.repo &> /dev/null 
 #if the above doesn't find rhui-1, it returns a failure, thus it couldn't find it. Checking for all 3 servers. 
 if [ $? -eq 0 ]; then
-cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-2.microsoft.com" &> /dev/null
+grep "rhui-2.microsoft.com" /etc/yum.repos.d/rh-cloud.repo &> /dev/null
   if [ $? -eq 0 ]; then
-     cat /etc/yum.repos.d/rh-cloud.repo | grep "rhui-3.microsoft.com" &> /dev/null
+     grep "rhui-3.microsoft.com" /etc/yum.repos.d/rh-cloud.repo &> /dev/null
          if [ $? -eq 0 ]; then
 cecho -c 'green' "Successful - /etc/yum.repos.d/rh-cloud.repo contains the 3 update servers."
    sleep 2
@@ -57,6 +57,21 @@ fi
 function sslcert {
 echo " " 
 cecho -c 'yellow' "Checking if the ssl cert dates are valid"
+#Assign the actual end date as a variable so it can be displayed later
+enddate=`openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not After'`
+#Check if the certificate expires in the next 60 seconds. If so, it's expired and needs refreshed. 
+sudo openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text -checkend 60 | grep "Certificate will expire" &> /dev/null
+if [ $? -eq 0 ]; then
+  cecho -c 'green' "Successful - The certificate is not expired"
+  cecho -c 'green' Expiration date: $enddate
+   sleep 2
+else
+cecho -c 'red' "The SSL cert has expired"
+cecho -c 'red' Expiration date: $enddate
+   cecho -c 'red' "See the following to update it: https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#manual-update-procedure-to-use-the-azure-rhui-servers"
+   safe_exit
+   fi
+
 openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not Before|Not After'
 read -p "Does today's date fall between the Not Before and Not After date? [y/n] " -n 1 -r
   echo
