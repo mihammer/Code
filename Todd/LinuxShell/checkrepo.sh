@@ -64,12 +64,12 @@ sudo openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text -checkend 6
 # Test if the above is not equal to 0. If 0, then it would indicate it has expired. 
 if [ $? -ne 0 ]; then
   cecho -c 'green' "Successful - The certificate is not expired"
-  cecho -c 'green' "Cert dates"
+  cecho -c 'green' "Valid Cert dates"
   openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not After|Not Before'
    sleep 2
 else
   cecho -c 'red' "The SSL cert has expired"
-  cecho -c 'red' "Cert dates"
+  cecho -c 'red' "Valid Cert dates"
   openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not After|Not Before'
   echo " "
    cecho -c 'red' "See the following to update it: https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-rhui#manual-update-procedure-to-use-the-azure-rhui-servers"
