@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
+#Hello World
 # Perform checks for yum on VMs using Microsoft Azure RHUI
 #
 VERSION="1.0.0"
