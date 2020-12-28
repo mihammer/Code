@@ -58,7 +58,7 @@ function sslcert {
 echo " " 
 cecho -c 'yellow' "Checking if the ssl cert dates are valid"
 #Assign the actual end date as a variable so it can be displayed later
-enddate=`openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not After'`
+enddate=$(openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text|grep -E 'Not After')
 #Check if the certificate expires in the next 60 seconds. If so, it's expired and needs refreshed. The following looks for "Certificate will expire", which will indicate it will expire.  
 sudo openssl x509 -in /etc/pki/rhui/product/content.crt -noout -text -checkend 60 | grep "Certificate will expire" &> /dev/null
 # Test if the above is not equal to 0. If 0, then it would indicate it has expired. 
